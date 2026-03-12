@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Panneau électrique</title>
+
+<style>
+
+body{
+background:#0b1117;
+color:white;
+font-family:Arial;
+text-align:center;
+margin:0;
+}
+
+h1{
+margin-top:10px;
+}
+
+#panelContainer{
+position:relative;
+width:650px;
+margin:auto;
+}
+
+canvas{
+background:#1b2633;
+border:8px solid #2f4050;
+border-radius:10px;
+}
+
+#cutter{
+position:absolute;
+font-size:40px;
+pointer-events:none;
+transform:translate(-50%,-50%);
+}
+
+#lights{
+display:flex;
+justify-content:center;
+gap:15px;
+margin:10px;
+}
+
+.light{
+width:18px;
+height:18px;
+border-radius:50%;
+background:#333;
+}
+
+.light.on{
+background:#2ecc71;
+box-shadow:0 0 10px #2ecc71;
+}
+
+#message{
+font-size:24px;
+height:30px;
+margin-top:10px;
+}
+
+.spark{
+position:absolute;
+width:6px;
+height:6px;
+background:yellow;
+border-radius:50%;
+animation:spark 0.5s forwards;
+}
+
+@keyframes spark{
+0%{opacity:1;transform:scale(1)}
+100%{opacity:0;transform:scale(4)}
+}
+
+.shake{
+animation:shake 0.4s;
+}
+
+@keyframes shake{
+0%{transform:translateX(0)}
+25%{transform:translateX(-5px)}
+50%{transform:translateX(5px)}
+75%{transform:translateX(-5px)}
+100%{transform:translateX(0)}
+}
+
+button{
+margin-top:10px;
+padding:10px 20px;
+font-size:18px;
+border:none;
+border-radius:6px;
+background:#3498db;
+color:white;
+cursor:pointer;
+}
+
+</style>
+</head>
+
+<body>
+
+<h1>Désamorcer le panneau</h1>
+
+<div id="lights">
+<div class="light"></div>
+<div class="light"></div>
+<div class="light"></div>
+</div>
+
+<div id="panelContainer">
+<canvas id="panel" width="650" height="400"></canvas>
+<div id="cutter">✂️</div>
+</div>
+
+<div id="message"></div>
+
+<button onclick="restart()">Rejouer</button>
+
+<script>
+
+const canvas=document.getElementById("panel")
+const ctx=canvas.getContext("2d")
+const cutter=document.getElementById("cutter")
+
+let cables
+let order
+let step
+let finished
+
+function randomY(){
+return 60 + Math.random()*280
+}
+
+function init(){
+
+cables=[
+
+{color:"red",start:[40,randomY()],end:[610,randomY()],cut:false},
+{color:"blue",start:[40,randomY()],end:[610,randomY()],cut:false},
+{color:"yellow",start:[40,randomY()],end:[610,randomY()],cut:false},
+{color:"pink",start:[40,randomY()],end:[610,randomY()],cut:false}
+
+]
+
+order=["red","blue","yellow"]
+
+step=0
+finished=false
+
+updateLights()
+draw()
+
+}
+
+function draw(){
+
+ctx.clearRect(0,0,canvas.width,canvas.height)
+
+cables.forEach(c=>{
+
+ctx.lineWidth=14
+ctx.lineCap="round"
+ctx.strokeStyle=c.cut?"#444":c.color
+
+ctx.beginPath()
+ctx.moveTo(c.start[0],c.start[1])
+ctx.lineTo(c.end[0],c.end[1])
+ctx.stroke()
+
+})
+
+}
+
+function distance(px,py,x1,y1,x2,y2){
+
+let A=px-x1
+let B=py-y1
+let C=x2-x1
+let D=y2-y1
+
+let dot=A*C+B*D
+let len=C*C+D*D
+let param=dot/len
+
+let xx,yy
+
+if(param<0){xx=x1;yy=y1}
+else if(param>1){xx=x2;yy=y2}
+else{
+xx=x1+param*C
+yy=y1+param*D
+}
+
+let dx=px-xx
+let dy=py-yy
+
+return Math.sqrt(dx*dx+dy*dy)
+
+}
+
+function sparks(x,y){
+
+for(let i=0;i<10;i++){
+
+let s=document.createElement("div")
+s.className="spark"
+
+s.style.left=(x+Math.random()*20-10)+"px"
+s.style.top=(y+Math.random()*20-10)+"px"
+
+document.getElementById("panelContainer").appendChild(s)
+
+setTimeout(()=>s.remove(),500)
+
+}
+
+}
+
+function cut(x,y){
+
+if(finished) return
+
+for(let c of cables){
+
+if(c.cut) continue
+
+let d=distance(x,y,c.start[0],c.start[1],c.end[0],c.end[1])
+
+if(d<12){
+
+sparks(x,y)
+
+if(c.color==="pink"){
+explode()
+return
+}
+
+if(c.color===order[step]){
+
+c.cut=true
+step++
+
+updateLights()
+
+draw()
+
+if(step===order.length){
+win()
+}
+
+return
+
+}else{
+
+explode()
+return
+
+}
+
+}
+
+}
+
+}
+
+function updateLights(){
+
+let lights=document.querySelectorAll(".light")
+
+lights.forEach((l,i)=>{
+l.classList.toggle("on",i<step)
+})
+
+}
+
+function win(){
+
+finished=true
+
+document.getElementById("message").innerText="Circuit déverrouillé — Code : 791"
+
+}
+
+function explode(){
+
+finished=true
+
+document.getElementById("panelContainer").classList.add("shake")
+
+document.getElementById("message").innerText="Explosion"
+
+}
+
+function restart(){
+
+document.getElementById("panelContainer").classList.remove("shake")
+document.getElementById("message").innerText=""
+
+init()
+
+}
+
+canvas.addEventListener("click",(e)=>{
+
+let rect=canvas.getBoundingClientRect()
+
+cut(
+e.clientX-rect.left,
+e.clientY-rect.top
+)
+
+})
+
+document.addEventListener("mousemove",(e)=>{
+
+let rect=canvas.getBoundingClientRect()
+
+cutter.style.left=(e.clientX-rect.left)+"px"
+cutter.style.top=(e.clientY-rect.top)+"px"
+
+})
+
+init()
+
+</script>
+
+</body>
+</html>
